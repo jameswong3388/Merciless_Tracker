@@ -12,19 +12,21 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/compo
 import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel,} from "@/components/ui/form";
 import {Switch} from "@/components/ui/switch";
 import {Textarea} from "@/components/ui/textarea";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 // Dynamically import ReactJson (SSR disabled)
 const ReactJson = dynamic(() => import("react18-json-view"), {
     ssr: false,
     loading: () => <p>Loading...</p>,
 });
-
-// Type definitions
-type NodeMeta = {
-    name?: string | number;
-    type: string;
-    parentPath?: (string | number)[];
-};
 
 type FormValues = {
     urls: string[];
@@ -44,11 +46,6 @@ type ExtractResult = {
     sources?: any;
 };
 
-type SelectedPath = {
-    path: (string | number)[];
-    value: any;
-};
-
 export default function Home() {
     // State management
     const [results, setResults] = useState<any[]>([]);
@@ -59,6 +56,7 @@ export default function Home() {
     } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [extractId, setExtractId] = useState<string | null>(null);
+    const [selectedModel, setSelectedModel] = useState("standard");
 
     // React Hook Form setup
     const form = useForm<FormValues>({
@@ -222,7 +220,16 @@ export default function Home() {
         const textToAnalyze = typeof content === "string" ? content : JSON.stringify(content);
 
         // Mock logic: random chance to detect "cyberbullying" if 'bad' is present or random
-        const isCyberbullying = textToAnalyze.toLowerCase().includes("bad") || Math.random() > 0.7;
+        // Add model sensitivity based on selectedModel
+        let threshold = 0.7; // default threshold for standard model
+        
+        if (selectedModel === "sensitive") {
+            threshold = 0.5; // more likely to detect cyberbullying
+        } else if (selectedModel === "relaxed") {
+            threshold = 0.9; // less likely to detect cyberbullying
+        }
+        
+        const isCyberbullying = textToAnalyze.toLowerCase().includes("bad") || Math.random() > threshold;
         const confidence = Math.round((0.5 + Math.random() * 0.5) * 100) / 100;
 
         setAnalysisResult({isCyberbullying, confidence});
@@ -502,7 +509,20 @@ export default function Home() {
                 <div className="h-1/2 p-6 overflow-y-auto">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold">Cyberbullying Analysis</h2>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
+                            <Select value={selectedModel} onValueChange={setSelectedModel}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select Model" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectGroup>
+                                        <SelectLabel>Analysis Models</SelectLabel>
+                                        <SelectItem value="standard">Standard</SelectItem>
+                                        <SelectItem value="sensitive">Sensitive</SelectItem>
+                                        <SelectItem value="relaxed">Relaxed</SelectItem>
+                                    </SelectGroup>
+                                </SelectContent>
+                            </Select>
                             <Button
                                 variant="outline"
                                 onClick={() => {
