@@ -15,6 +15,8 @@ type FormValues = {
 
 export default function Home() {
   const [results, setResults] = useState<string[]>([]);
+  const [selectedData, setSelectedData] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{isCyberbullying: boolean; confidence: number} | null>(null);
   
   const form = useForm<FormValues>({
     defaultValues: {
@@ -27,6 +29,17 @@ export default function Home() {
     console.log(values);
     // This would be where the web crawling API is called
     setResults([`Crawled ${values.url} with depth ${values.depth}`, ...results]);
+  };
+
+  const analyzeContent = (content: string) => {
+    // Mock analysis - in a real app, this would call an AI/ML API
+    const isCyberbullying = content.toLowerCase().includes('bad') || Math.random() > 0.7;
+    const confidence = Math.round((0.5 + Math.random() * 0.5) * 100) / 100;
+    
+    setAnalysisResult({
+      isCyberbullying,
+      confidence
+    });
   };
 
   return (
@@ -117,31 +130,90 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Right Panel - Results */}
-      <div className="w-2/3 p-6 overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Crawling Results</h2>
-          <Button variant="outline" onClick={() => setResults([])}>Clear Results</Button>
+      {/* Right Panel - Split into Results and Analysis */}
+      <div className="w-2/3 flex flex-col h-full overflow-hidden">
+        {/* Top Half - Results */}
+        <div className="h-1/2 p-6 overflow-y-auto border-b">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Crawling Results</h2>
+            <Button variant="outline" onClick={() => setResults([])}>Clear Results</Button>
+          </div>
+          
+          {results.length > 0 ? (
+            <div className="space-y-4">
+              {results.map((result, index) => (
+                <Card key={index} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedData(result)}>
+                  <CardContent className="pt-6">
+                    <p>{result}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="bg-muted/50">
+              <CardContent className="pt-6 flex flex-col items-center justify-center min-h-[150px] text-center">
+                <p className="text-muted-foreground mb-2">No crawling results yet</p>
+                <p className="text-muted-foreground text-sm">Enter a URL and click "Start Crawling" to begin</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
         
-        {results.length > 0 ? (
-          <div className="space-y-4">
-            {results.map((result, index) => (
-              <Card key={index}>
-                <CardContent className="pt-6">
-                  <p>{result}</p>
+        {/* Bottom Half - Analysis */}
+        <div className="h-1/2 p-6 overflow-y-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Cyberbullying Analysis</h2>
+            <Button 
+              variant="outline" 
+              onClick={() => selectedData && analyzeContent(selectedData)}
+              disabled={!selectedData}
+            >
+              Analyze Selected Content
+            </Button>
+          </div>
+          
+          {selectedData ? (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Selected Content</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm">{selectedData}</p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="bg-muted/50">
-            <CardContent className="pt-6 flex flex-col items-center justify-center min-h-[300px] text-center">
-              <p className="text-muted-foreground mb-2">No crawling results yet</p>
-              <p className="text-muted-foreground text-sm">Enter a URL and click "Start Crawling" to begin</p>
-            </CardContent>
-          </Card>
-        )}
+              
+              {analysisResult && (
+                <Card className={analysisResult.isCyberbullying ? "border-red-500" : "border-green-500"}>
+                  <CardHeader>
+                    <CardTitle>Analysis Result</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Classification:</span>
+                        <span className={analysisResult.isCyberbullying ? "text-red-500 font-bold" : "text-green-500 font-bold"}>
+                          {analysisResult.isCyberbullying ? "Cyberbullying Content" : "Safe Content"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Confidence:</span>
+                        <span>{(analysisResult.confidence * 100).toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <Card className="bg-muted/50">
+              <CardContent className="pt-6 flex flex-col items-center justify-center min-h-[150px] text-center">
+                <p className="text-muted-foreground mb-2">No content selected</p>
+                <p className="text-muted-foreground text-sm">Click on a result above to analyze it for cyberbullying</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
