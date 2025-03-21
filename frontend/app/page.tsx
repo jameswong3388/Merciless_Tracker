@@ -1,35 +1,30 @@
 "use client";
 
 import {useState} from "react";
+import {useForm} from "react-hook-form";
+import dynamic from "next/dynamic";
+import {toast, Toaster} from "sonner";
+import {Layers} from "lucide-react";
+
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
-    Form,
-    FormControl,
-    FormDescription,
-    FormField,
-    FormItem,
-    FormLabel,
-} from "@/components/ui/form";
-import {useForm} from "react-hook-form";
-import {Layers} from "lucide-react";
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
+import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel,} from "@/components/ui/form";
 import {Switch} from "@/components/ui/switch";
 import {Textarea} from "@/components/ui/textarea";
-import {toast, Toaster} from "sonner";
-import dynamic from "next/dynamic";
 
 // Dynamically import ReactJson (SSR disabled)
-const ReactJson = dynamic(() => import('react18-json-view'), {
+const ReactJson = dynamic(() => import("react18-json-view"), {
     ssr: false,
     loading: () => <p>Loading...</p>,
 });
+
+// Type definitions
+type NodeMeta = {
+    name?: string | number;
+    type: string;
+    parentPath?: (string | number)[];
+};
 
 type FormValues = {
     urls: string[];
@@ -49,9 +44,16 @@ type ExtractResult = {
     sources?: any;
 };
 
+type SelectedPath = {
+    path: (string | number)[];
+    value: any;
+};
+
 export default function Home() {
+    // State management
     const [results, setResults] = useState<any[]>([]);
     const [selectedData, setSelectedData] = useState<any | null>(null);
+    const [selectedAttribute, setSelectedAttribute] = useState<SelectedPath | null>(null);
     const [analysisResult, setAnalysisResult] = useState<{
         isCyberbullying: boolean;
         confidence: number;
@@ -59,6 +61,7 @@ export default function Home() {
     const [isLoading, setIsLoading] = useState(false);
     const [extractId, setExtractId] = useState<string | null>(null);
 
+    // React Hook Form setup
     const form = useForm<FormValues>({
         defaultValues: {
             urls: ["https://cyber-bully-demo-website.vercel.app"],
@@ -92,9 +95,57 @@ export default function Home() {
         },
     });
 
+    /**
+     * Helper function to poll for extraction results
+     */
+    const pollForResults = async (id: string) => {
+        try {
+            const pollPromise = fetch(`http://localhost:3002/v1/extract/${id}`).then(async (res) => {
+                if (!res.ok) {
+                    throw new Error(`API error: ${res.status}`);
+                }
+
+                const responseData = await res.json();
+
+                // Check the status from the response
+                if (responseData.status === "completed") {
+                    const resultData = responseData.data || responseData.result || {};
+                    setResults([resultData, ...results]);
+                    return {message: "Extraction completed successfully!"};
+                } else if (responseData.status === "processing") {
+                    setTimeout(() => pollForResults(id), 5000);
+                    setResults([{status: "processing", id}, ...results]);
+                    return {message: "Still processing, will check again soon..."};
+                } else if (responseData.status === "failed") {
+                    throw new Error(responseData.error || "Unknown error");
+                }
+
+                throw new Error("Unknown status");
+            });
+
+            toast.promise(pollPromise, {
+                loading: "Checking extraction status...",
+                success: (data) => data.message,
+                error: (err) => `Extraction failed: ${err.message}`,
+            });
+
+            await pollPromise;
+        } catch (error) {
+            console.error("Error polling for results:", error);
+            setResults((prev) => [
+                {status: "error", error: error instanceof Error ? error.message : String(error)},
+                ...prev,
+            ]);
+        }
+    };
+
+    /**
+     * Form submission handler: starts the extraction process
+     */
     const onSubmit = async (values: FormValues) => {
         setIsLoading(true);
         try {
+            // Remove empty URL fields
             const filteredUrls = values.urls.filter((url) => url.trim() !== "");
             if (filteredUrls.length === 0) {
                 toast.error("Please enter at least one URL");
@@ -105,15 +156,13 @@ export default function Home() {
             if (values.schema.trim()) {
                 try {
                     parsedSchema = JSON.parse(values.schema);
-                } catch (error) {
+                } catch {
                     toast.error("Invalid JSON schema");
                     throw new Error("Invalid JSON schema");
                 }
             }
 
-            toast.info("Starting extraction...");
-
-            const response = await fetch("http://localhost:3002/v1/extract", {
+            const extractPromise = fetch("http://localhost:3002/v1/extract", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -126,100 +175,89 @@ export default function Home() {
                     ignoreSitemap: values.ignoreSitemap,
                     includeSubdomains: values.includeSubdomains,
                 }),
-            });
+            }).then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                const data: ExtractResult = await response.json();
 
-            if (!response.ok) {
-                toast.error(`API error: ${response.status}`);
-                throw new Error(`API error: ${response.status}`);
-            }
+                if (!data.success) {
+                    throw new Error("Extract request failed");
+                }
 
-            const data: ExtractResult = await response.json();
-
-            if (data.success) {
-                toast.success(`Extract completed with ID: ${data.extractId}`);
                 setExtractId(data.extractId);
-                setResults([data.data || {}, ...results]);
 
-                if (!data.data) {
+                // If data is immediately available, set results. Otherwise, poll.
+                if (data.data) {
+                    setResults([data.data, ...results]);
+                } else {
                     pollForResults(data.extractId);
                 }
-            } else {
-                toast.error("Extract request failed");
-                throw new Error("Extract request failed");
-            }
+
+                return data;
+            });
+
+            toast.promise(extractPromise, {
+                loading: "Starting extraction...",
+                success: (data) => `Extract completed with ID: ${data.extractId}`,
+                error: (err) => err.message || "An error occurred during extraction",
+            });
+
+            await extractPromise;
         } catch (error) {
             console.error("Error starting extract:", error);
-            setResults([
-                `Error: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
-                ...results,
+            setResults((prev) => [
+                `Error: ${error instanceof Error ? error.message : String(error)}`,
+                ...prev,
             ]);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const pollForResults = async (id: string) => {
-        try {
-            const response = await fetch(`http://localhost:3002/v1/extract/${id}`);
+    /**
+     * Analyzes content to check for (mocked) cyberbullying
+     */
+    const analyzeContent = (content: any) => {
+        // Convert to string if content is not a string
+        const textToAnalyze = typeof content === "string" ? content : JSON.stringify(content);
 
-            if (!response.ok) {
-                toast.error(`API error: ${response.status}`);
-                throw new Error(`API error: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.status === "completed") {
-                toast.success("Extraction completed successfully!");
-                const resultData = data.data || data.result || {};
-                setResults([resultData, ...results]);
-            } else if (data.status === "processing") {
-                setTimeout(() => pollForResults(id), 5000);
-                setResults([{status: "processing", id}, ...results]);
-            } else if (data.status === "failed") {
-                toast.error(`Extract failed: ${data.error || "Unknown error"}`);
-                setResults([
-                    {status: "failed", error: data.error || "Unknown error"},
-                    ...results,
-                ]);
-            }
-        } catch (error) {
-            console.error("Error polling for results:", error);
-            toast.error(
-                `Polling error: ${
-                    error instanceof Error ? error.message : String(error)
-                }`
-            );
-            setResults([
-                {
-                    status: "error",
-                    error: error instanceof Error ? error.message : String(error),
-                },
-                ...results,
-            ]);
-        }
-    };
-
-    const analyzeContent = (content: string) => {
-        // Mock analysis logic
-        const isCyberbullying =
-            content.toLowerCase().includes("bad") || Math.random() > 0.7;
+        // Mock logic: random chance to detect "cyberbullying" if 'bad' is present or random
+        const isCyberbullying = textToAnalyze.toLowerCase().includes("bad") || Math.random() > 0.7;
         const confidence = Math.round((0.5 + Math.random() * 0.5) * 100) / 100;
 
         setAnalysisResult({isCyberbullying, confidence});
     };
 
+    /**
+     * Selects an attribute from the JSON tree
+     */
+    const handleAttributeSelect = (indexOrName: string | number, value: any, nodeMeta: NodeMeta) => {
+        if (nodeMeta?.parentPath) {
+            const path = [...nodeMeta.parentPath, indexOrName];
+            setSelectedAttribute({path, value});
+            toast.success(`Selected: ${path.join(".")}`);
+        }
+    };
+
+    /**
+     * Utility function to add a new empty URL field
+     */
     const addUrlField = () => {
         const currentUrls = form.getValues().urls;
         form.setValue("urls", [...currentUrls, ""]);
     };
 
+    /**
+     * Utility function to remove a URL field
+     */
     const removeUrlField = (index: number) => {
         const currentUrls = form.getValues().urls;
         if (currentUrls.length > 1) {
-            form.setValue("urls", currentUrls.filter((_, i) => i !== index));
+            form.setValue(
+                "urls",
+                currentUrls.filter((_, i) => i !== index)
+            );
         }
     };
 
@@ -249,6 +287,7 @@ export default function Home() {
                     <CardContent>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                                {/* URLs to extract */}
                                 <div className="space-y-2">
                                     <FormLabel>URLs to extract</FormLabel>
                                     {form.watch("urls").map((_, index) => (
@@ -275,16 +314,12 @@ export default function Home() {
                                             </Button>
                                         </div>
                                     ))}
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={addUrlField}
-                                        className="w-full"
-                                    >
+                                    <Button type="button" variant="outline" onClick={addUrlField} className="w-full">
                                         Add URL
                                     </Button>
                                 </div>
 
+                                {/* Extraction prompt */}
                                 <FormField
                                     control={form.control}
                                     name="prompt"
@@ -305,6 +340,7 @@ export default function Home() {
                                     )}
                                 />
 
+                                {/* JSON Schema */}
                                 <FormField
                                     control={form.control}
                                     name="schema"
@@ -345,10 +381,7 @@ export default function Home() {
                                                         },
                                                         required: ["comments"],
                                                     };
-                                                    form.setValue(
-                                                        "schema",
-                                                        JSON.stringify(sampleSchema, null, 2)
-                                                    );
+                                                    form.setValue("schema", JSON.stringify(sampleSchema, null, 2));
                                                 }}
                                             >
                                                 Load Sample Schema
@@ -357,7 +390,9 @@ export default function Home() {
                                     )}
                                 />
 
+                                {/* Switches */}
                                 <div className="space-y-4">
+                                    {/* Enable Web Search */}
                                     <FormField
                                         control={form.control}
                                         name="enableWebSearch"
@@ -371,15 +406,13 @@ export default function Home() {
                                                     </FormDescription>
                                                 </div>
                                                 <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
+                                                    <Switch checked={field.value} onCheckedChange={field.onChange}/>
                                                 </FormControl>
                                             </FormItem>
                                         )}
                                     />
 
+                                    {/* Ignore Sitemap */}
                                     <FormField
                                         control={form.control}
                                         name="ignoreSitemap"
@@ -393,15 +426,13 @@ export default function Home() {
                                                     </FormDescription>
                                                 </div>
                                                 <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
+                                                    <Switch checked={field.value} onCheckedChange={field.onChange}/>
                                                 </FormControl>
                                             </FormItem>
                                         )}
                                     />
 
+                                    {/* Include Subdomains */}
                                     <FormField
                                         control={form.control}
                                         name="includeSubdomains"
@@ -415,10 +446,7 @@ export default function Home() {
                                                     </FormDescription>
                                                 </div>
                                                 <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
+                                                    <Switch checked={field.value} onCheckedChange={field.onChange}/>
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -451,7 +479,10 @@ export default function Home() {
                                 <Card
                                     key={index}
                                     className="cursor-pointer hover:bg-muted/50"
-                                    onClick={() => setSelectedData(result)}
+                                    onClick={() => {
+                                        setSelectedData(result);
+                                        setSelectedAttribute(null);
+                                    }}
                                 >
                                     <CardContent className="pt-6">
                                         {typeof result === "string" ? (
@@ -461,6 +492,33 @@ export default function Home() {
                                                 src={result}
                                                 collapsed={2}
                                                 enableClipboard={false}
+                                                customizeNode={(node: any, nodeMeta: any) => {
+                                                    // Highlight node if it matches the selected attribute
+                                                    if (selectedAttribute && nodeMeta?.parentPath) {
+                                                        const metaPath = nodeMeta.parentPath as (string | number)[];
+                                                        const isExactMatch =
+                                                            metaPath.length + 1 === selectedAttribute.path.length &&
+                                                            selectedAttribute.path.every((item, i) =>
+                                                                i < metaPath.length ? item === metaPath[i] : true
+                                                            ) &&
+                                                            selectedAttribute.path[selectedAttribute.path.length - 1] ===
+                                                            nodeMeta.name;
+
+                                                        if (isExactMatch) {
+                                                            return {
+                                                                style: {
+                                                                    backgroundColor: "rgba(59, 130, 246, 0.3)",
+                                                                    borderRadius: "4px",
+                                                                    padding: "2px",
+                                                                },
+                                                            };
+                                                        }
+                                                    }
+                                                    return {};
+                                                }}
+                                                onSelect={(key, value, nodeMeta) =>
+                                                    handleAttributeSelect(key, value, nodeMeta as NodeMeta)
+                                                }
                                             />
                                         )}
                                     </CardContent>
@@ -471,11 +529,9 @@ export default function Home() {
                         <Card className="bg-muted/50">
                             <CardContent
                                 className="pt-6 flex flex-col items-center justify-center min-h-[150px] text-center">
-                                <p className="text-muted-foreground mb-2">
-                                    No extraction results yet
-                                </p>
+                                <p className="text-muted-foreground mb-2">No extraction results yet</p>
                                 <p className="text-muted-foreground text-sm">
-                                    Enter URLs and click "Start Extraction" to begin
+                                    Enter URLs and click &quot;Start Extraction&quot; to begin
                                 </p>
                             </CardContent>
                         </Card>
@@ -486,28 +542,72 @@ export default function Home() {
                 <div className="h-1/2 p-6 overflow-y-auto">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold">Cyberbullying Analysis</h2>
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                selectedData && analyzeContent(selectedData as string)
-                            }
-                            disabled={!selectedData}
-                        >
-                            Analyze Selected Content
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    if (selectedAttribute) {
+                                        analyzeContent(selectedAttribute.value);
+                                    } else if (selectedData) {
+                                        analyzeContent(selectedData);
+                                    }
+                                }}
+                                disabled={!selectedData && !selectedAttribute}
+                            >
+                                {selectedAttribute ? "Analyze Selected Attribute" : "Analyze All Content"}
+                            </Button>
+                        </div>
                     </div>
 
                     {selectedData && (
                         <div className="space-y-4">
                             <Card>
-                                <CardHeader>
-                                    <CardTitle>Selected Content</CardTitle>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex justify-between items-center">
+                                        <span>Selected Content</span>
+                                        {selectedAttribute && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setSelectedAttribute(null)}
+                                            >
+                                                Clear Selected Attribute
+                                            </Button>
+                                        )}
+                                    </CardTitle>
+                                    {selectedAttribute && (
+                                        <CardDescription>
+                                            Selected attribute path: {selectedAttribute.path.join(".")}
+                                        </CardDescription>
+                                    )}
                                 </CardHeader>
                                 <CardContent>
-                                    {typeof selectedData === "string" ? (
+                                    {selectedAttribute ? (
+                                        typeof selectedAttribute.value === "string" ? (
+                                            <p className="text-sm">{selectedAttribute.value}</p>
+                                        ) : (
+                                            <ReactJson
+                                                src={selectedAttribute.value}
+                                                collapsed={1}
+                                                onSelect={(key, value, nodeMeta) => {
+                                                    if (nodeMeta?.parentPath) {
+                                                        const path = [...selectedAttribute.path, ...nodeMeta.parentPath, key];
+                                                        setSelectedAttribute({path, value});
+                                                        toast.success(`Selected: ${path.join(".")}`);
+                                                    }
+                                                }}
+                                            />
+                                        )
+                                    ) : typeof selectedData === "string" ? (
                                         <p className="text-sm">{selectedData}</p>
                                     ) : (
-                                        <ReactJson src={selectedData} collapsed={1}/>
+                                        <ReactJson
+                                            src={selectedData}
+                                            collapsed={1}
+                                            onSelect={(key, value, nodeMeta) =>
+                                                handleAttributeSelect(key, value, nodeMeta as NodeMeta)
+                                            }
+                                        />
                                     )}
                                 </CardContent>
                             </Card>
@@ -515,13 +615,16 @@ export default function Home() {
                             {analysisResult && (
                                 <Card
                                     className={
-                                        analysisResult.isCyberbullying
-                                            ? "border-red-500"
-                                            : "border-green-500"
+                                        analysisResult.isCyberbullying ? "border-red-500" : "border-green-500"
                                     }
                                 >
                                     <CardHeader>
                                         <CardTitle>Analysis Result</CardTitle>
+                                        {selectedAttribute && (
+                                            <CardDescription>
+                                                Analysis of: {selectedAttribute.path.join(".")}
+                                            </CardDescription>
+                                        )}
                                     </CardHeader>
                                     <CardContent>
                                         <div className="flex flex-col space-y-2">
@@ -541,9 +644,7 @@ export default function Home() {
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span className="font-medium">Confidence:</span>
-                                                <span>
-                          {(analysisResult.confidence * 100).toFixed(1)}%
-                        </span>
+                                                <span>{(analysisResult.confidence * 100).toFixed(1)}%</span>
                                             </div>
                                         </div>
                                     </CardContent>
