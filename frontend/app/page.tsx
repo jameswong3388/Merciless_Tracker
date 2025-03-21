@@ -53,7 +53,6 @@ export default function Home() {
     // State management
     const [results, setResults] = useState<any[]>([]);
     const [selectedData, setSelectedData] = useState<any | null>(null);
-    const [selectedAttribute, setSelectedAttribute] = useState<SelectedPath | null>(null);
     const [analysisResult, setAnalysisResult] = useState<{
         isCyberbullying: boolean;
         confidence: number;
@@ -227,17 +226,6 @@ export default function Home() {
         const confidence = Math.round((0.5 + Math.random() * 0.5) * 100) / 100;
 
         setAnalysisResult({isCyberbullying, confidence});
-    };
-
-    /**
-     * Selects an attribute from the JSON tree
-     */
-    const handleAttributeSelect = (indexOrName: string | number, value: any, nodeMeta: NodeMeta) => {
-        if (nodeMeta?.parentPath) {
-            const path = [...nodeMeta.parentPath, indexOrName];
-            setSelectedAttribute({path, value});
-            toast.success(`Selected: ${path.join(".")}`);
-        }
     };
 
     /**
@@ -481,7 +469,6 @@ export default function Home() {
                                     className="cursor-pointer hover:bg-muted/50"
                                     onClick={() => {
                                         setSelectedData(result);
-                                        setSelectedAttribute(null);
                                     }}
                                 >
                                     <CardContent className="pt-6">
@@ -492,33 +479,6 @@ export default function Home() {
                                                 src={result}
                                                 collapsed={2}
                                                 enableClipboard={false}
-                                                customizeNode={(node: any, nodeMeta: any) => {
-                                                    // Highlight node if it matches the selected attribute
-                                                    if (selectedAttribute && nodeMeta?.parentPath) {
-                                                        const metaPath = nodeMeta.parentPath as (string | number)[];
-                                                        const isExactMatch =
-                                                            metaPath.length + 1 === selectedAttribute.path.length &&
-                                                            selectedAttribute.path.every((item, i) =>
-                                                                i < metaPath.length ? item === metaPath[i] : true
-                                                            ) &&
-                                                            selectedAttribute.path[selectedAttribute.path.length - 1] ===
-                                                            nodeMeta.name;
-
-                                                        if (isExactMatch) {
-                                                            return {
-                                                                style: {
-                                                                    backgroundColor: "rgba(59, 130, 246, 0.3)",
-                                                                    borderRadius: "4px",
-                                                                    padding: "2px",
-                                                                },
-                                                            };
-                                                        }
-                                                    }
-                                                    return {};
-                                                }}
-                                                onSelect={(key, value, nodeMeta) =>
-                                                    handleAttributeSelect(key, value, nodeMeta as NodeMeta)
-                                                }
                                             />
                                         )}
                                     </CardContent>
@@ -546,15 +506,13 @@ export default function Home() {
                             <Button
                                 variant="outline"
                                 onClick={() => {
-                                    if (selectedAttribute) {
-                                        analyzeContent(selectedAttribute.value);
-                                    } else if (selectedData) {
+                                    if (selectedData) {
                                         analyzeContent(selectedData);
                                     }
                                 }}
-                                disabled={!selectedData && !selectedAttribute}
+                                disabled={!selectedData}
                             >
-                                {selectedAttribute ? "Analyze Selected Attribute" : "Analyze All Content"}
+                                Analyze All Content
                             </Button>
                         </div>
                     </div>
@@ -565,48 +523,15 @@ export default function Home() {
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex justify-between items-center">
                                         <span>Selected Content</span>
-                                        {selectedAttribute && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setSelectedAttribute(null)}
-                                            >
-                                                Clear Selected Attribute
-                                            </Button>
-                                        )}
                                     </CardTitle>
-                                    {selectedAttribute && (
-                                        <CardDescription>
-                                            Selected attribute path: {selectedAttribute.path.join(".")}
-                                        </CardDescription>
-                                    )}
                                 </CardHeader>
                                 <CardContent>
-                                    {selectedAttribute ? (
-                                        typeof selectedAttribute.value === "string" ? (
-                                            <p className="text-sm">{selectedAttribute.value}</p>
-                                        ) : (
-                                            <ReactJson
-                                                src={selectedAttribute.value}
-                                                collapsed={1}
-                                                onSelect={(key, value, nodeMeta) => {
-                                                    if (nodeMeta?.parentPath) {
-                                                        const path = [...selectedAttribute.path, ...nodeMeta.parentPath, key];
-                                                        setSelectedAttribute({path, value});
-                                                        toast.success(`Selected: ${path.join(".")}`);
-                                                    }
-                                                }}
-                                            />
-                                        )
-                                    ) : typeof selectedData === "string" ? (
+                                    {typeof selectedData === "string" ? (
                                         <p className="text-sm">{selectedData}</p>
                                     ) : (
                                         <ReactJson
                                             src={selectedData}
                                             collapsed={1}
-                                            onSelect={(key, value, nodeMeta) =>
-                                                handleAttributeSelect(key, value, nodeMeta as NodeMeta)
-                                            }
                                         />
                                     )}
                                 </CardContent>
@@ -620,11 +545,6 @@ export default function Home() {
                                 >
                                     <CardHeader>
                                         <CardTitle>Analysis Result</CardTitle>
-                                        {selectedAttribute && (
-                                            <CardDescription>
-                                                Analysis of: {selectedAttribute.path.join(".")}
-                                            </CardDescription>
-                                        )}
                                     </CardHeader>
                                     <CardContent>
                                         <div className="flex flex-col space-y-2">
