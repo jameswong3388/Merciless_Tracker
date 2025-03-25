@@ -226,131 +226,128 @@ export default function Home() {
     const analyzeContent = async (content: any) => {
         setIsLoading(true);
         try {
-            // Extract text samples to analyze based on content structure
-            const textSamples: { text: string, source: string }[] = [];
-            
-            if (typeof content === 'string') {
-                // If content is a string, use it directly
-                textSamples.push({ text: content, source: 'content' });
-            } else if (content?.comments && Array.isArray(content.comments)) {
-                // Extract each comment text as a separate item to analyze
-                content.comments.forEach((comment: any, index: number) => {
-                    if (comment.comment_text) {
-                        textSamples.push({ 
-                            text: comment.comment_text, 
-                            source: `comment-${index}-${comment.username || 'unknown'}`
-                        });
-                    }
-                });
+            // Reset text samples
+            const textSamples: { text: string; source: string }[] = [];
+
+            if (typeof content === "string") {
+                // If content is a plain string, use it directly with "root" as the source
+                textSamples.push({text: content, source: "root"});
             } else {
-                // For other JSON structures, try to find all string properties and analyze them
-                const extractStrings = (obj: any, path: string = 'root') => {
-                    if (!obj) return;
-                    
-                    if (typeof obj === 'string' && obj.trim().length > 10) {
-                        // Only consider strings with reasonable length
-                        textSamples.push({ text: obj, source: path });
+                // Recursively extract all string attributes and use their JSON paths as the source.
+                const extractStrings = (obj: any, path: string = "root") => {
+                    if (obj === null || obj === undefined) return;
+                    if (typeof obj === "string") {
+                        // Optionally, you can add length filtering if desired
+                        textSamples.push({text: obj, source: path});
                     } else if (Array.isArray(obj)) {
                         obj.forEach((item, idx) => extractStrings(item, `${path}[${idx}]`));
-                    } else if (typeof obj === 'object') {
-                        Object.entries(obj).forEach(([key, value]) => 
-                            extractStrings(value, `${path}.${key}`)
-                        );
+                    } else if (typeof obj === "object") {
+                        Object.entries(obj).forEach(([key, value]) => {
+                            extractStrings(value, `${path}.${key}`);
+                        });
                     }
                 };
-                
                 extractStrings(content);
-                
-                // If no samples were found, use the stringified JSON as fallback
+
+                // Fallback: if no string samples were found, use the entire JSON
                 if (textSamples.length === 0) {
-                    textSamples.push({ 
-                        text: JSON.stringify(content), 
-                        source: 'serialized-json' 
+                    textSamples.push({
+                        text: JSON.stringify(content),
+                        source: "serialized-json",
                     });
                 }
             }
-            
+
             // Analysis results storage
             const results = [];
-            
+
             // Analyze each text sample
             for (const sample of textSamples) {
                 try {
-                    const response = await fetch('http://localhost:3399/analyze', {
-                        method: 'POST',
+                    const response = await fetch("http://localhost:3399/analyze", {
+                        method: "POST",
                         headers: {
-                            'Content-Type': 'application/json',
+                            "Content-Type": "application/json",
                         },
                         body: JSON.stringify({
                             model_type: selectedModel,
-                            text: sample.text
+                            text: sample.text,
                         }),
                     });
-                    
+
                     if (!response.ok) {
                         console.warn(`API error for ${sample.source}: ${response.status}`);
                         continue;
                     }
-                    
+
                     const result = await response.json();
                     results.push({
-                        text: sample.text.length > 100 ? `${sample.text.substring(0, 100)}...` : sample.text,
+                        text:
+                            sample.text.length > 100
+                                ? `${sample.text.substring(0, 100)}...`
+                                : sample.text,
                         source: sample.source,
                         isCyberbullying: result.isCyberbullying,
                         cyberbullying_type: result.cyberbullying_type,
-                        confidence: result.confidence || 0.5
+                        confidence: result.confidence || 0.5,
                     });
                 } catch (error) {
                     console.warn(`Error analyzing ${sample.source}:`, error);
                 }
             }
-            
+
             // Calculate overall results
             if (results.length > 0) {
                 // Count cyberbullying instances
-                const bullying = results.filter(r => r.isCyberbullying);
+                const bullying = results.filter((r) => r.isCyberbullying);
                 const bullyingCount = bullying.length;
-                
+
                 // Calculate average confidence
-                const avgConfidence = results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
-                
+                const avgConfidence =
+                    results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
+
                 // Determine overall cyberbullying type (most common non-safe type)
                 const typeCounts = bullying.reduce((counts: Record<string, number>, item) => {
                     const type = item.cyberbullying_type;
                     counts[type] = (counts[type] || 0) + 1;
                     return counts;
                 }, {});
-                
-                const mostCommonType = Object.entries(typeCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([type]) => Number(type))[0] || 3; // Default to 3 (safe) if no bullying found
-                
+
+                const mostCommonType =
+                    Object.entries(typeCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([type]) => Number(type))[0] || 3; // Default to 3 (safe) if no bullying found
+
                 // Set overall analysis result
                 setAnalysisResult({
                     isCyberbullying: bullyingCount > 0,
                     cyberbullying_type: mostCommonType,
                     confidence: avgConfidence,
-                    details: results
+                    details: results,
                 });
-                
+
                 toast.success(`Analysis completed: Analyzed ${results.length} text samples`);
             } else {
-                toast.warning('No suitable text found for analysis');
+                toast.warning("No suitable text found for analysis");
                 setAnalysisResult({
                     isCyberbullying: false,
                     cyberbullying_type: 3,
-                    confidence: 1.0
+                    confidence: 1.0,
                 });
             }
         } catch (error) {
-            console.error('Error analyzing content:', error);
-            toast.error(`Analysis failed: ${error instanceof Error ? error.message : String(error)}`);
-            
+            console.error("Error analyzing content:", error);
+            toast.error(
+                `Analysis failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`
+            );
+
             // Fallback to mock response in case of errors
             setAnalysisResult({
                 isCyberbullying: Math.random() > 0.5,
                 cyberbullying_type: Math.floor(Math.random() * 3),
-                confidence: Math.round((0.5 + Math.random() * 0.5) * 100) / 100
+                confidence: Math.round((0.5 + Math.random() * 0.5) * 100) / 100,
             });
         } finally {
             setIsLoading(false);
