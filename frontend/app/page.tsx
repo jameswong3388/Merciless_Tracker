@@ -723,31 +723,83 @@ export default function Home() {
                                                 </div>
                                             )}
                                             {analysisResult.details && analysisResult.details.length > 0 && (
-                                                <div className="mt-4">
-                                                    <p className="font-medium mb-2">Details:</p>
-                                                    <div className="max-h-64 overflow-y-auto">
-                                                        <table className="w-full text-sm">
-                                                            <thead className="bg-muted/50">
-                                                                <tr>
-                                                                    <th className="text-left p-2">Source</th>
-                                                                    <th className="text-left p-2">Text</th>
-                                                                    <th className="text-center p-2">Result</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {analysisResult.details.map((detail, idx) => (
-                                                                    <tr key={idx} className="border-b">
-                                                                        <td className="p-2 text-xs">{detail.source}</td>
-                                                                        <td className="p-2">{detail.text}</td>
-                                                                        <td className={`p-2 text-center ${detail.isCyberbullying ? "text-red-500" : "text-green-500"}`}>
-                                                                            {detail.isCyberbullying ? "⚠️" : "✓"}
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
+                                                <>
+                                                    <div className="mt-4 bg-muted/20 p-3 rounded-lg">
+                                                        <h3 className="font-medium mb-2">Statistics:</h3>
+                                                        {(() => {
+                                                            if (!analysisResult.details) return null;
+                                                            
+                                                            const totalSamples = analysisResult.details.length;
+                                                            const bullying = analysisResult.details.filter(d => d.isCyberbullying);
+                                                            const bullyingCount = bullying.length;
+                                                            const safeCount = totalSamples - bullyingCount;
+                                                            const bullyingPercentage = Math.round((bullyingCount / totalSamples) * 100);
+                                                            const safePercentage = 100 - bullyingPercentage;
+                                                            
+                                                            return (
+                                                                <div className="space-y-3">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span>Total Analyzed Samples:</span>
+                                                                        <span className="font-bold">{totalSamples}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="flex items-center">
+                                                                            <span className="inline-block w-4 h-4 bg-green-500 rounded-full mr-2"></span>
+                                                                            Safe Content:
+                                                                        </span>
+                                                                        <span className="font-bold">{safeCount} ({safePercentage}%)</span>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="flex items-center">
+                                                                            <span className="inline-block w-4 h-4 bg-red-500 rounded-full mr-2"></span>
+                                                                            Bullying Content:
+                                                                        </span>
+                                                                        <span className="font-bold">{bullyingCount} ({bullyingPercentage}%)</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                                                                        <div 
+                                                                            className="bg-red-500 h-2.5 rounded-full" 
+                                                                            style={{ width: `${bullyingPercentage}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </div>
-                                                </div>
+                                                    <div className="mt-4">
+                                                        <p className="font-medium mb-2">Details:</p>
+                                                        <div className="max-h-64 overflow-y-auto">
+                                                            <table className="w-full text-sm">
+                                                                <thead className="bg-muted/50">
+                                                                    <tr>
+                                                                        <th className="text-left p-2">Source</th>
+                                                                        <th className="text-left p-2">Text</th>
+                                                                        <th className="text-center p-2">Result</th>
+                                                                        <th className="text-center p-2">Type</th>
+                                                                        <th className="text-center p-2">Confidence</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {analysisResult.details.map((detail, idx) => (
+                                                                        <tr key={idx} className="border-b">
+                                                                            <td className="p-2 text-xs">{detail.source}</td>
+                                                                            <td className="p-2">{detail.text}</td>
+                                                                            <td className={`p-2 text-center ${detail.isCyberbullying ? "text-red-500" : "text-green-500"}`}>
+                                                                                {detail.isCyberbullying ? "⚠️" : "✓"}
+                                                                            </td>
+                                                                            <td className="p-2 text-center">
+                                                                                {detail.isCyberbullying ? detail.cyberbullying_type : "—"}
+                                                                            </td>
+                                                                            <td className="p-2 text-center">
+                                                                                {(detail.confidence * 100).toFixed(0)}%
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
                                     </CardContent>
