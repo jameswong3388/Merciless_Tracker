@@ -10,7 +10,7 @@ export const mockUser: User = {
 export const mockReplies: Comment[] = [
   {
     id: '101',
-    content: 'This is a nested reply to the comment!',
+    content: 'Lol, Jewish ppl always think they’re better than everyone else smh 🤦‍♂️',
     createdAt: '2023-06-15T10:30:00Z',
     author: {
       id: '2',
@@ -23,7 +23,7 @@ export const mockReplies: Comment[] = [
   },
   {
     id: '102',
-    content: 'Another nested reply with more context.',
+    content: 'Yo, why do women always wanna join tech?? 😂 U should stick to something else!',
     createdAt: '2023-06-15T11:45:00Z',
     author: {
       id: '3',
@@ -34,10 +34,9 @@ export const mockReplies: Comment[] = [
     likes: 5,
     replies: []
   },
-  // New nested replies
   {
     id: '103',
-    content: 'Adding more detail to the discussion here.',
+    content: 'Bro, black ppl don’t even get it. 😂 Stay out of tech 💀',
     createdAt: '2023-06-15T12:15:00Z',
     author: {
       id: '5',
@@ -50,7 +49,7 @@ export const mockReplies: Comment[] = [
   },
   {
     id: '104',
-    content: 'Great points above, but what about scalability?',
+    content: 'Ayo, under 18s talking about tech like they know smh. U need to chill out, kids 😂',
     createdAt: '2023-06-15T12:45:00Z',
     author: {
       id: '6',
@@ -66,7 +65,7 @@ export const mockReplies: Comment[] = [
 export const mockComments: Comment[] = [
   {
     id: '1',
-    content: 'This is a great post! I really enjoyed reading it.',
+    content: 'Ayy, I’m Christian but this is actually a vibe! 🔥 Keep up the good work, for real!',
     createdAt: '2023-06-15T09:30:00Z',
     author: {
       id: '2',
@@ -79,7 +78,7 @@ export const mockComments: Comment[] = [
   },
   {
     id: '2',
-    content: 'I have a different perspective on this topic...',
+    content: 'I’m Hispanic and honestly, ur opinion is kinda biased tho 🤷‍♂️. It’s not all that clear.',
     createdAt: '2023-06-15T10:15:00Z',
     author: {
       id: '3',
@@ -92,7 +91,7 @@ export const mockComments: Comment[] = [
   },
   {
     id: '3',
-    content: 'Thanks for sharing this information!',
+    content: 'Bruh, I’m a woman in tech and I think ur assumptions are just outdated 🙄. Do better!',
     createdAt: '2023-06-15T11:00:00Z',
     author: {
       id: '4',
@@ -103,10 +102,9 @@ export const mockComments: Comment[] = [
     likes: 15,
     replies: []
   },
-  // Additional comments with nested replies
   {
     id: '4',
-    content: 'Curious to know how you handled performance optimizations.',
+    content: 'Yo, I think black ppl have no clue when it comes to tech topics lol 🤦‍♀️ Just my opinion.',
     createdAt: '2023-06-15T12:30:00Z',
     author: {
       id: '5',
@@ -118,7 +116,7 @@ export const mockComments: Comment[] = [
     replies: [
       {
         id: '201',
-        content: 'Performance was definitely a challenge, but we used caching heavily.',
+        content: 'For real, white ppl get it better than black ppl in tech tbh 🤷‍♂️',
         createdAt: '2023-06-15T12:40:00Z',
         author: {
           id: '1',
@@ -131,7 +129,7 @@ export const mockComments: Comment[] = [
       },
       {
         id: '202',
-        content: 'Did you consider server-side rendering for this part?',
+        content: 'Caucasians have way better understanding, don’t even argue with that 🤷‍♀️',
         createdAt: '2023-06-15T12:50:00Z',
         author: {
           id: '6',
@@ -146,7 +144,7 @@ export const mockComments: Comment[] = [
   },
   {
     id: '5',
-    content: 'I love the UI design choices you made. Very user-friendly!',
+    content: 'Bruh, older ppl always stuck in their ways, they don’t understand anything 😂 smh',
     createdAt: '2023-06-15T13:00:00Z',
     author: {
       id: '7',
@@ -158,7 +156,7 @@ export const mockComments: Comment[] = [
     replies: [
       {
         id: '203',
-        content: 'Totally agree! The color palette and layout feel really polished.',
+        content: 'Yo, I’m LGBTQ+ and older people just aren’t with the times 😩. They need to open their minds.',
         createdAt: '2023-06-15T13:15:00Z',
         author: {
           id: '8',
@@ -170,7 +168,7 @@ export const mockComments: Comment[] = [
         replies: [
           {
             id: '301',
-            content: 'Yes, and the typography is spot on. Nice job, team!',
+            content: 'Yeah, like older people can’t get it 🤦‍♂️. They’re stuck in the past 💀.',
             createdAt: '2023-06-15T13:25:00Z',
             author: {
               id: '9',
@@ -189,7 +187,7 @@ export const mockComments: Comment[] = [
 
 export const mockTweet: Tweet = {
   id: '123456',
-  content: 'Just launched a new feature for our product! Check it out and let me know what you think. #innovation #tech',
+  content: 'Just launched a new feature for our product! Check it out and let me know what you think. Muslim 😎 #innovation #tech',
   createdAt: '2023-06-15T08:00:00Z',
   author: mockUser,
   likes: 142,
