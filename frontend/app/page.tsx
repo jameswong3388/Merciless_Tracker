@@ -668,20 +668,21 @@ export default function Home() {
                     </div>
 
                     {selectedData && (
-                        <div className="space-y-4">
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="flex justify-between items-center">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Card className="md:col-span-1 shadow-sm hover:shadow-md transition-shadow">
+                                <CardHeader className="pb-2 bg-muted/30">
+                                    <CardTitle className="text-lg flex items-center gap-2">
                                         <span>Selected Content</span>
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="max-h-[400px] overflow-y-auto">
                                     {typeof selectedData === "string" ? (
                                         <p className="text-sm">{selectedData}</p>
                                     ) : (
                                         <ReactJson
                                             src={selectedData}
                                             collapsed={1}
+                                            theme="default"
                                         />
                                     )}
                                 </CardContent>
@@ -689,43 +690,76 @@ export default function Home() {
 
                             {analysisResult && (
                                 <Card
-                                    className={
-                                        analysisResult.isCyberbullying ? "border-red-500" : "border-green-500"
-                                    }
+                                    className={`md:col-span-1 shadow-sm hover:shadow-md transition-shadow ${
+                                        analysisResult.isCyberbullying 
+                                            ? "border-l-4 border-l-red-500" 
+                                            : "border-l-4 border-l-green-500"
+                                    }`}
                                 >
-                                    <CardHeader>
-                                        <CardTitle>Analysis Result</CardTitle>
+                                    <CardHeader className={`pb-2 ${
+                                        analysisResult.isCyberbullying 
+                                            ? "bg-red-50" 
+                                            : "bg-green-50"
+                                    }`}>
+                                        <CardTitle className="text-lg flex justify-between items-center">
+                                            <span>Analysis Result</span>
+                                            <span
+                                                className={`text-sm px-3 py-1 rounded-full ${
+                                                    analysisResult.isCyberbullying
+                                                        ? "bg-red-100 text-red-700"
+                                                        : "bg-green-100 text-green-700"
+                                                }`}
+                                            >
+                                                {analysisResult.isCyberbullying
+                                                    ? "Cyberbullying Detected"
+                                                    : "Safe Content"}
+                                            </span>
+                                        </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="flex flex-col space-y-2">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-medium">Classification:</span>
-                                                <span
-                                                    className={
-                                                        analysisResult.isCyberbullying
-                                                            ? "text-red-500 font-bold"
-                                                            : "text-green-500 font-bold"
-                                                    }
-                                                >
-                                                    {analysisResult.isCyberbullying
-                                                        ? "Cyberbullying Content"
-                                                        : "Safe Content"}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-medium">Confidence:</span>
-                                                <span>{(analysisResult.confidence * 100).toFixed(1)}%</span>
-                                            </div>
-                                            {analysisResult.isCyberbullying && (
-                                                <div className="flex justify-between items-center">
-                                                    <span className="font-medium">Bullying Type:</span>
-                                                    <span>{analysisResult.cyberbullying_type}</span>
+                                        <div className="flex flex-col space-y-4">
+                                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                                <div className="col-span-1 bg-gray-50 p-4 rounded-lg shadow-inner">
+                                                    <p className="text-sm font-medium text-gray-500 mb-1">Confidence</p>
+                                                    <div className="flex items-center">
+                                                        <div className="text-xl font-bold mr-2">
+                                                            {(analysisResult.confidence * 100).toFixed(1)}%
+                                                        </div>
+                                                        <div className="flex-1 h-2 bg-gray-200 rounded-full">
+                                                            <div 
+                                                                className={`h-2 rounded-full ${
+                                                                    analysisResult.isCyberbullying ? "bg-red-600" : "bg-green-600"
+                                                                }`}
+                                                                style={{ width: `${analysisResult.confidence * 100}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            )}
+                                                
+                                                {analysisResult.isCyberbullying && (
+                                                    <div className="col-span-1 bg-gray-50 p-4 rounded-lg shadow-inner">
+                                                        <p className="text-sm font-medium text-gray-500 mb-1">Bullying Type</p>
+                                                        <div className="flex items-center">
+                                                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 mr-3">
+                                                                {analysisResult.cyberbullying_type}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium">Type {analysisResult.cyberbullying_type}</p>
+                                                                <p className="text-xs text-gray-500">
+                                                                    {analysisResult.cyberbullying_type === 0 ? "Gender" : 
+                                                                     analysisResult.cyberbullying_type === 1 ? "Religion" : 
+                                                                     analysisResult.cyberbullying_type === 2 ? "Other" : "Unknown"}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
                                             {analysisResult.details && analysisResult.details.length > 0 && (
                                                 <>
-                                                    <div className="mt-4 bg-muted/20 p-3 rounded-lg">
-                                                        <h3 className="font-medium mb-2">Statistics:</h3>
+                                                    <div className="bg-gray-50 p-4 rounded-lg shadow-inner mt-4">
+                                                        <h3 className="font-medium mb-3 text-gray-700">Analysis Summary</h3>
                                                         {(() => {
                                                             if (!analysisResult.details) return null;
                                                             
@@ -738,25 +772,33 @@ export default function Home() {
                                                             
                                                             return (
                                                                 <div className="space-y-3">
-                                                                    <div className="flex items-center justify-between">
-                                                                        <span>Total Analyzed Samples:</span>
-                                                                        <span className="font-bold">{totalSamples}</span>
+                                                                    <div className="text-center mb-4">
+                                                                        <span className="text-2xl font-bold">{totalSamples}</span>
+                                                                        <p className="text-sm text-gray-500">Total Analyzed Samples</p>
                                                                     </div>
-                                                                    <div className="flex items-center justify-between">
-                                                                        <span className="flex items-center">
-                                                                            <span className="inline-block w-4 h-4 bg-green-500 rounded-full mr-2"></span>
-                                                                            Safe Content:
+                                                                    
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <span className="flex items-center text-sm">
+                                                                            <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                                                                            Safe Content
                                                                         </span>
-                                                                        <span className="font-bold">{safeCount} ({safePercentage}%)</span>
+                                                                        <span className="text-sm font-medium">{safeCount} ({safePercentage}%)</span>
                                                                     </div>
-                                                                    <div className="flex items-center justify-between">
-                                                                        <span className="flex items-center">
-                                                                            <span className="inline-block w-4 h-4 bg-red-500 rounded-full mr-2"></span>
-                                                                            Bullying Content:
+                                                                    <div className="w-full bg-gray-200 rounded-full h-2.5 mb-3">
+                                                                        <div 
+                                                                            className="bg-green-500 h-2.5 rounded-full" 
+                                                                            style={{ width: `${safePercentage}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <span className="flex items-center text-sm">
+                                                                            <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+                                                                            Bullying Content
                                                                         </span>
-                                                                        <span className="font-bold">{bullyingCount} ({bullyingPercentage}%)</span>
+                                                                        <span className="text-sm font-medium">{bullyingCount} ({bullyingPercentage}%)</span>
                                                                     </div>
-                                                                    <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                                                                    <div className="w-full bg-gray-200 rounded-full h-2.5">
                                                                         <div 
                                                                             className="bg-red-500 h-2.5 rounded-full" 
                                                                             style={{ width: `${bullyingPercentage}%` }}
@@ -766,32 +808,54 @@ export default function Home() {
                                                             );
                                                         })()}
                                                     </div>
+                                                    
                                                     <div className="mt-4">
-                                                        <p className="font-medium mb-2">Details:</p>
-                                                        <div className="max-h-64 overflow-y-auto">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <h3 className="font-medium text-gray-700">Content Details</h3>
+                                                            <span className="text-xs text-gray-500">
+                                                                {analysisResult.details.filter(d => d.isCyberbullying).length} problematic items
+                                                            </span>
+                                                        </div>
+                                                        <div className="max-h-64 overflow-y-auto border rounded-lg">
                                                             <table className="w-full text-sm">
-                                                                <thead className="bg-muted/50">
+                                                                <thead className="bg-gray-100">
                                                                     <tr>
-                                                                        <th className="text-left p-2">Source</th>
-                                                                        <th className="text-left p-2">Text</th>
-                                                                        <th className="text-center p-2">Result</th>
-                                                                        <th className="text-center p-2">Type</th>
-                                                                        <th className="text-center p-2">Confidence</th>
+                                                                        <th className="text-left p-2 text-xs font-medium text-gray-500">Source</th>
+                                                                        <th className="text-left p-2 text-xs font-medium text-gray-500">Text</th>
+                                                                        <th className="text-center p-2 text-xs font-medium text-gray-500">Status</th>
+                                                                        <th className="text-center p-2 text-xs font-medium text-gray-500">Confidence</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
                                                                     {analysisResult.details.map((detail, idx) => (
-                                                                        <tr key={idx} className="border-b">
-                                                                            <td className="p-2 text-xs">{detail.source}</td>
+                                                                        <tr key={idx} 
+                                                                            className={`border-b ${
+                                                                                detail.isCyberbullying ? "bg-red-50" : ""
+                                                                            }`}
+                                                                        >
+                                                                            <td className="p-2 text-xs font-mono">{detail.source}</td>
                                                                             <td className="p-2">{detail.text}</td>
-                                                                            <td className={`p-2 text-center ${detail.isCyberbullying ? "text-red-500" : "text-green-500"}`}>
-                                                                                {detail.isCyberbullying ? "⚠️" : "✓"}
+                                                                            <td className="p-2 text-center">
+                                                                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${
+                                                                                    detail.isCyberbullying 
+                                                                                        ? "bg-red-100 text-red-700" 
+                                                                                        : "bg-green-100 text-green-700"
+                                                                                }`}>
+                                                                                    {detail.isCyberbullying ? "!" : "✓"}
+                                                                                </span>
                                                                             </td>
                                                                             <td className="p-2 text-center">
-                                                                                {detail.isCyberbullying ? detail.cyberbullying_type : "—"}
-                                                                            </td>
-                                                                            <td className="p-2 text-center">
-                                                                                {(detail.confidence * 100).toFixed(0)}%
+                                                                                <div className="w-full bg-gray-200 rounded-full h-1.5 flex items-center">
+                                                                                    <div 
+                                                                                        className={`h-1.5 rounded-full ${
+                                                                                            detail.isCyberbullying ? "bg-red-500" : "bg-green-500"
+                                                                                        }`}
+                                                                                        style={{ width: `${detail.confidence * 100}%` }}
+                                                                                    ></div>
+                                                                                </div>
+                                                                                <span className="text-xs mt-1 block">
+                                                                                    {(detail.confidence * 100).toFixed(0)}%
+                                                                                </span>
                                                                             </td>
                                                                         </tr>
                                                                     ))}
@@ -806,6 +870,22 @@ export default function Home() {
                                 </Card>
                             )}
                         </div>
+                    )}
+
+                    {!selectedData && !analysisResult && (
+                        <Card className="shadow-sm bg-muted/10">
+                            <CardContent className="flex flex-col items-center justify-center py-12">
+                                <div className="rounded-full bg-gray-100 p-3 mb-4">
+                                    <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+                                    </div>
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-700 mb-2">No Analysis Data</h3>
+                                <p className="text-center text-sm text-gray-500 max-w-xs">
+                                    Select extraction data from above and click "Analyze All Content" to perform cyberbullying analysis
+                                </p>
+                            </CardContent>
+                        </Card>
                     )}
                 </div>
             </div>
