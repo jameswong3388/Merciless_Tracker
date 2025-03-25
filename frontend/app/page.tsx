@@ -52,11 +52,19 @@ export default function Home() {
     const [selectedData, setSelectedData] = useState<any | null>(null);
     const [analysisResult, setAnalysisResult] = useState<{
         isCyberbullying: boolean;
+        cyberbullying_type: number;
         confidence: number;
+        details?: Array<{
+            text: string, 
+            source: string, 
+            isCyberbullying: boolean, 
+            cyberbullying_type: number, 
+            confidence: number
+        }>;
     } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [extractId, setExtractId] = useState<string | null>(null);
-    const [selectedModel, setSelectedModel] = useState("standard");
+    const [selectedModel, setSelectedModel] = useState("rf");
 
     // React Hook Form setup
     const form = useForm<FormValues>({
@@ -213,26 +221,140 @@ export default function Home() {
     };
 
     /**
-     * Analyzes content to check for (mocked) cyberbullying
+     * Analyzes content to check for cyberbullying
      */
-    const analyzeContent = (content: any) => {
-        // Convert to string if content is not a string
-        const textToAnalyze = typeof content === "string" ? content : JSON.stringify(content);
-
-        // Mock logic: random chance to detect "cyberbullying" if 'bad' is present or random
-        // Add model sensitivity based on selectedModel
-        let threshold = 0.7; // default threshold for standard model
-        
-        if (selectedModel === "sensitive") {
-            threshold = 0.5; // more likely to detect cyberbullying
-        } else if (selectedModel === "relaxed") {
-            threshold = 0.9; // less likely to detect cyberbullying
+    const analyzeContent = async (content: any) => {
+        setIsLoading(true);
+        try {
+            // Extract text samples to analyze based on content structure
+            const textSamples: { text: string, source: string }[] = [];
+            
+            if (typeof content === 'string') {
+                // If content is a string, use it directly
+                textSamples.push({ text: content, source: 'content' });
+            } else if (content?.comments && Array.isArray(content.comments)) {
+                // Extract each comment text as a separate item to analyze
+                content.comments.forEach((comment: any, index: number) => {
+                    if (comment.comment_text) {
+                        textSamples.push({ 
+                            text: comment.comment_text, 
+                            source: `comment-${index}-${comment.username || 'unknown'}`
+                        });
+                    }
+                });
+            } else {
+                // For other JSON structures, try to find all string properties and analyze them
+                const extractStrings = (obj: any, path: string = 'root') => {
+                    if (!obj) return;
+                    
+                    if (typeof obj === 'string' && obj.trim().length > 10) {
+                        // Only consider strings with reasonable length
+                        textSamples.push({ text: obj, source: path });
+                    } else if (Array.isArray(obj)) {
+                        obj.forEach((item, idx) => extractStrings(item, `${path}[${idx}]`));
+                    } else if (typeof obj === 'object') {
+                        Object.entries(obj).forEach(([key, value]) => 
+                            extractStrings(value, `${path}.${key}`)
+                        );
+                    }
+                };
+                
+                extractStrings(content);
+                
+                // If no samples were found, use the stringified JSON as fallback
+                if (textSamples.length === 0) {
+                    textSamples.push({ 
+                        text: JSON.stringify(content), 
+                        source: 'serialized-json' 
+                    });
+                }
+            }
+            
+            // Analysis results storage
+            const results = [];
+            
+            // Analyze each text sample
+            for (const sample of textSamples) {
+                try {
+                    const response = await fetch('http://localhost:3399/analyze', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            model_type: selectedModel,
+                            text: sample.text
+                        }),
+                    });
+                    
+                    if (!response.ok) {
+                        console.warn(`API error for ${sample.source}: ${response.status}`);
+                        continue;
+                    }
+                    
+                    const result = await response.json();
+                    results.push({
+                        text: sample.text.length > 100 ? `${sample.text.substring(0, 100)}...` : sample.text,
+                        source: sample.source,
+                        isCyberbullying: result.isCyberbullying,
+                        cyberbullying_type: result.cyberbullying_type,
+                        confidence: result.confidence || 0.5
+                    });
+                } catch (error) {
+                    console.warn(`Error analyzing ${sample.source}:`, error);
+                }
+            }
+            
+            // Calculate overall results
+            if (results.length > 0) {
+                // Count cyberbullying instances
+                const bullying = results.filter(r => r.isCyberbullying);
+                const bullyingCount = bullying.length;
+                
+                // Calculate average confidence
+                const avgConfidence = results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
+                
+                // Determine overall cyberbullying type (most common non-safe type)
+                const typeCounts = bullying.reduce((counts: Record<string, number>, item) => {
+                    const type = item.cyberbullying_type;
+                    counts[type] = (counts[type] || 0) + 1;
+                    return counts;
+                }, {});
+                
+                const mostCommonType = Object.entries(typeCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([type]) => Number(type))[0] || 3; // Default to 3 (safe) if no bullying found
+                
+                // Set overall analysis result
+                setAnalysisResult({
+                    isCyberbullying: bullyingCount > 0,
+                    cyberbullying_type: mostCommonType,
+                    confidence: avgConfidence,
+                    details: results
+                });
+                
+                toast.success(`Analysis completed: Analyzed ${results.length} text samples`);
+            } else {
+                toast.warning('No suitable text found for analysis');
+                setAnalysisResult({
+                    isCyberbullying: false,
+                    cyberbullying_type: 3,
+                    confidence: 1.0
+                });
+            }
+        } catch (error) {
+            console.error('Error analyzing content:', error);
+            toast.error(`Analysis failed: ${error instanceof Error ? error.message : String(error)}`);
+            
+            // Fallback to mock response in case of errors
+            setAnalysisResult({
+                isCyberbullying: Math.random() > 0.5,
+                cyberbullying_type: Math.floor(Math.random() * 3),
+                confidence: Math.round((0.5 + Math.random() * 0.5) * 100) / 100
+            });
+        } finally {
+            setIsLoading(false);
         }
-        
-        const isCyberbullying = textToAnalyze.toLowerCase().includes("bad") || Math.random() > threshold;
-        const confidence = Math.round((0.5 + Math.random() * 0.5) * 100) / 100;
-
-        setAnalysisResult({isCyberbullying, confidence});
     };
 
     /**
@@ -517,9 +639,10 @@ export default function Home() {
                                 <SelectContent>
                                     <SelectGroup>
                                         <SelectLabel>Analysis Models</SelectLabel>
-                                        <SelectItem value="standard">Standard</SelectItem>
-                                        <SelectItem value="sensitive">Sensitive</SelectItem>
-                                        <SelectItem value="relaxed">Relaxed</SelectItem>
+                                        <SelectItem value="rf">Random Forest</SelectItem>
+                                        <SelectItem value="mnb">Multinomial Naive Bayes</SelectItem>
+                                        <SelectItem value="lg">Logistic Regression</SelectItem>
+                                        <SelectItem value="svm">SVM</SelectItem>
                                     </SelectGroup>
                                 </SelectContent>
                             </Select>
@@ -530,9 +653,19 @@ export default function Home() {
                                         analyzeContent(selectedData);
                                     }
                                 }}
-                                disabled={!selectedData}
+                                disabled={!selectedData || isLoading}
                             >
-                                Analyze All Content
+                                {isLoading ? "Analyzing..." : "Analyze All Content"}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setAnalysisResult(null);
+                                    setSelectedData(null);
+                                }}
+                                disabled={!analysisResult && !selectedData}
+                            >
+                                Clear Analysis
                             </Button>
                         </div>
                     </div>
@@ -577,15 +710,48 @@ export default function Home() {
                                                             : "text-green-500 font-bold"
                                                     }
                                                 >
-                          {analysisResult.isCyberbullying
-                              ? "Cyberbullying Content"
-                              : "Safe Content"}
-                        </span>
+                                                    {analysisResult.isCyberbullying
+                                                        ? "Cyberbullying Content"
+                                                        : "Safe Content"}
+                                                </span>
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span className="font-medium">Confidence:</span>
                                                 <span>{(analysisResult.confidence * 100).toFixed(1)}%</span>
                                             </div>
+                                            {analysisResult.isCyberbullying && (
+                                                <div className="flex justify-between items-center">
+                                                    <span className="font-medium">Bullying Type:</span>
+                                                    <span>{analysisResult.cyberbullying_type}</span>
+                                                </div>
+                                            )}
+                                            {analysisResult.details && analysisResult.details.length > 0 && (
+                                                <div className="mt-4">
+                                                    <p className="font-medium mb-2">Details:</p>
+                                                    <div className="max-h-64 overflow-y-auto">
+                                                        <table className="w-full text-sm">
+                                                            <thead className="bg-muted/50">
+                                                                <tr>
+                                                                    <th className="text-left p-2">Source</th>
+                                                                    <th className="text-left p-2">Text</th>
+                                                                    <th className="text-center p-2">Result</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {analysisResult.details.map((detail, idx) => (
+                                                                    <tr key={idx} className="border-b">
+                                                                        <td className="p-2 text-xs">{detail.source}</td>
+                                                                        <td className="p-2">{detail.text}</td>
+                                                                        <td className={`p-2 text-center ${detail.isCyberbullying ? "text-red-500" : "text-green-500"}`}>
+                                                                            {detail.isCyberbullying ? "⚠️" : "✓"}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </CardContent>
                                 </Card>
