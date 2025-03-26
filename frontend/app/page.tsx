@@ -52,13 +52,15 @@ export default function Home() {
     const [selectedData, setSelectedData] = useState<any | null>(null);
     const [analysisResult, setAnalysisResult] = useState<{
         isCyberbullying: boolean;
-        cyberbullying_type: number;
+        cyberbullying_type: string;
+        cyberbullying_type_encode: number;
         confidence: number;
         details?: Array<{
             text: string, 
             source: string, 
             isCyberbullying: boolean, 
-            cyberbullying_type: number, 
+            cyberbullying_type: string,
+            cyberbullying_type_encode: number,
             confidence: number
         }>;
     } | null>(null);
@@ -289,6 +291,7 @@ export default function Home() {
                         source: sample.source,
                         isCyberbullying: result.isCyberbullying,
                         cyberbullying_type: result.cyberbullying_type,
+                        cyberbullying_type_encode: result.cyberbullying_type_encode,
                         confidence: result.confidence || 0.5,
                     });
                 } catch (error) {
@@ -313,15 +316,23 @@ export default function Home() {
                     return counts;
                 }, {});
 
-                const mostCommonType =
-                    Object.entries(typeCounts)
+                // Get most common type (defaulting to "not_cyberbullying" if no bullying found)
+                const mostCommonType = bullyingCount > 0 
+                    ? Object.entries(typeCounts)
                         .sort((a, b) => b[1] - a[1])
-                        .map(([type]) => Number(type))[0] || 3; // Default to 3 (safe) if no bullying found
+                        .map(([type]) => type)[0] 
+                    : "not_cyberbullying";
+                
+                // Get the corresponding encode value
+                const mostCommonEncode = bullyingCount > 0 && bullying.length > 0
+                    ? bullying.find(b => b.cyberbullying_type === mostCommonType)?.cyberbullying_type_encode || 3
+                    : 3; // Default to 3 for not_cyberbullying
 
                 // Set overall analysis result
                 setAnalysisResult({
                     isCyberbullying: bullyingCount > 0,
                     cyberbullying_type: mostCommonType,
+                    cyberbullying_type_encode: mostCommonEncode,
                     confidence: avgConfidence,
                     details: results,
                 });
@@ -331,7 +342,8 @@ export default function Home() {
                 toast.warning("No suitable text found for analysis");
                 setAnalysisResult({
                     isCyberbullying: false,
-                    cyberbullying_type: 3,
+                    cyberbullying_type: "not_cyberbullying",
+                    cyberbullying_type_encode: 3,
                     confidence: 1.0,
                 });
             }
@@ -346,7 +358,8 @@ export default function Home() {
             // Fallback to mock response in case of errors
             setAnalysisResult({
                 isCyberbullying: Math.random() > 0.5,
-                cyberbullying_type: Math.floor(Math.random() * 3),
+                cyberbullying_type: Math.random() > 0.5 ? "not_cyberbullying" : ["age", "ethnicity", "gender", "religion"][Math.floor(Math.random() * 4)],
+                cyberbullying_type_encode: Math.random() > 0.5 ? 3 : [0, 1, 2, 5][Math.floor(Math.random() * 4)],
                 confidence: Math.round((0.5 + Math.random() * 0.5) * 100) / 100,
             });
         } finally {
@@ -718,7 +731,7 @@ export default function Home() {
                                     </CardHeader>
                                     <CardContent>
                                         <div className="flex flex-col space-y-4">
-                                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                            <div className="grid grid-cols-1 gap-4 mt-2">
                                                 <div className="col-span-1 bg-gray-50 p-4 rounded-lg shadow-inner">
                                                     <p className="text-sm font-medium text-gray-500 mb-1">Confidence</p>
                                                     <div className="flex items-center">
@@ -735,25 +748,6 @@ export default function Home() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                
-                                                {analysisResult.isCyberbullying && (
-                                                    <div className="col-span-1 bg-gray-50 p-4 rounded-lg shadow-inner">
-                                                        <p className="text-sm font-medium text-gray-500 mb-1">Bullying Type</p>
-                                                        <div className="flex items-center">
-                                                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 mr-3">
-                                                                {analysisResult.cyberbullying_type}
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-medium">Type {analysisResult.cyberbullying_type}</p>
-                                                                <p className="text-xs text-gray-500">
-                                                                    {analysisResult.cyberbullying_type === 0 ? "Gender" : 
-                                                                     analysisResult.cyberbullying_type === 1 ? "Religion" : 
-                                                                     analysisResult.cyberbullying_type === 2 ? "Other" : "Unknown"}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
                                             
                                             {analysisResult.details && analysisResult.details.length > 0 && (
@@ -769,6 +763,13 @@ export default function Home() {
                                                             const safeCount = totalSamples - bullyingCount;
                                                             const bullyingPercentage = Math.round((bullyingCount / totalSamples) * 100);
                                                             const safePercentage = 100 - bullyingPercentage;
+                                                            
+                                                            // Group by cyberbullying type
+                                                            const bullyingTypes = bullying.reduce((acc, item) => {
+                                                                const type = item.cyberbullying_type;
+                                                                acc[type] = (acc[type] || 0) + 1;
+                                                                return acc;
+                                                            }, {} as Record<string, number>);
                                                             
                                                             return (
                                                                 <div className="space-y-3">
@@ -804,6 +805,40 @@ export default function Home() {
                                                                             style={{ width: `${bullyingPercentage}%` }}
                                                                         ></div>
                                                                     </div>
+
+                                                                    {/* Cyberbullying type breakdown */}
+                                                                    {bullyingCount > 0 && (
+                                                                        <div className="mt-4 pt-3 border-t border-gray-200">
+                                                                            <h4 className="text-sm font-medium text-gray-700 mb-2">Cyberbullying Types Detected</h4>
+                                                                            <div className="space-y-2">
+                                                                                {Object.entries(bullyingTypes).map(([type, count]) => {
+                                                                                    // Get the encode value for this type
+                                                                                    const encodeValue = bullying.find(b => b.cyberbullying_type === type)?.cyberbullying_type_encode;
+                                                                                    const typePercentage = Math.round((count / bullyingCount) * 100);
+
+                                                                                    return (
+                                                                                        <div key={type} className="space-y-1">
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <div className="flex items-center">
+                                                                                                    <span className="w-4 h-4 inline-flex items-center justify-center bg-red-100 text-red-800 rounded-full text-xs mr-2">
+                                                                                                        {encodeValue}
+                                                                                                    </span>
+                                                                                                    <span className="text-sm capitalize">{type}</span>
+                                                                                                </div>
+                                                                                                <span className="text-xs font-medium">{count} ({typePercentage}%)</span>
+                                                                                            </div>
+                                                                                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                                                                                <div
+                                                                                                    className="bg-red-400 h-1.5 rounded-full"
+                                                                                                    style={{ width: `${typePercentage}%` }}
+                                                                                                ></div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         })()}
@@ -823,6 +858,7 @@ export default function Home() {
                                                                         <th className="text-left p-2 text-xs font-medium text-gray-500">Source</th>
                                                                         <th className="text-left p-2 text-xs font-medium text-gray-500">Text</th>
                                                                         <th className="text-center p-2 text-xs font-medium text-gray-500">Status</th>
+                                                                        <th className="text-center p-2 text-xs font-medium text-gray-500">Type</th>
                                                                         <th className="text-center p-2 text-xs font-medium text-gray-500">Confidence</th>
                                                                     </tr>
                                                                 </thead>
@@ -843,6 +879,18 @@ export default function Home() {
                                                                                 }`}>
                                                                                     {detail.isCyberbullying ? "!" : "✓"}
                                                                                 </span>
+                                                                            </td>
+                                                                            <td className="p-2 text-center">
+                                                                                {detail.isCyberbullying ? (
+                                                                                    <span className="px-2 py-1 rounded-md bg-red-50 text-red-800 text-xs capitalize">
+                                                                                        {detail.cyberbullying_type}
+                                                                                        <span className="text-xs text-red-600 ml-1">
+                                                                                            {detail.cyberbullying_type_encode}
+                                                                                        </span>
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="text-xs text-green-600">safe</span>
+                                                                                )}
                                                                             </td>
                                                                             <td className="p-2 text-center">
                                                                                 <div className="w-full bg-gray-200 rounded-full h-1.5 flex items-center">
@@ -882,7 +930,7 @@ export default function Home() {
                                 </div>
                                 <h3 className="text-lg font-medium text-gray-700 mb-2">No Analysis Data</h3>
                                 <p className="text-center text-sm text-gray-500 max-w-xs">
-                                    Select extraction data from above and click "Analyze All Content" to perform cyberbullying analysis
+                                    Select extraction data from above and click &#34;Analyze All Content&#34; to perform cyberbullying analysis
                                 </p>
                             </CardContent>
                         </Card>

@@ -42,7 +42,8 @@ class AnalysisRequest(BaseModel):
 
 class AnalysisResponse(BaseModel):
     isCyberbullying: bool
-    cyberbullying_type: float
+    cyberbullying_type: str
+    cyberbullying_type_encode: int
     confidence: float = None
 
 @app.get("/")
@@ -81,6 +82,15 @@ def analyze_text(request: AnalysisRequest):
         prediction = model.predict([request.text])
         pred = prediction[0]
 
+        # Create mapping of prediction codes to cyberbullying types
+        cyberbullying_types = {
+            0: "age",
+            1: "ethnicity",
+            2: "gender",
+            3: "not_cyberbullying",
+            5: "religion"
+        }
+
         # Compute confidence score if possible
         confidence = None
         if hasattr(model, "predict_proba"):
@@ -93,8 +103,9 @@ def analyze_text(request: AnalysisRequest):
             confidence = 1 / (1 + math.exp(-max(decision[0])))
 
         return {
-            "isCyberbullying": pred != 3,  # Assuming class 3 means non-cyberbullying
-            "cyberbullying_type": float(pred),
+            "isCyberbullying": pred != 3,  # Class 3 means non-cyberbullying
+            "cyberbullying_type": cyberbullying_types.get(int(pred), "unknown"),
+            "cyberbullying_type_encode": int(pred),
             "confidence": confidence,
         }
 
