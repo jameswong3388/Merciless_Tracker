@@ -2,7 +2,7 @@ import re
 from collections import defaultdict
 
 # Constants
-DATA_PATH = '../Part A Dataset/Data_3.txt'
+DATA_PATH = './Data_3.txt'
 TOKEN_PATTERN = r'<\/*s>|\w+'
 
 
@@ -76,6 +76,7 @@ def calculate_probability(bigrams, bigram_counts, word_counts, vocab_size, smoot
 # Main processing
 training_data = read_training_sentences(DATA_PATH)
 bigram_counts, word_counts, vocab_size = calculate_bigram_stats(training_data)
+print(f"Vocabulary Size (V): {vocab_size}")  # This will print the vocabulary size
 
 # Process test sentence
 test_sentence = "<s> I read a different book by Danielle </s>"
